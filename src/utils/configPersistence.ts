@@ -36,12 +36,43 @@ export function loadSavedConfig(): ServerConfig | null {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const saved = JSON.parse(content) as ServerConfig;
+    const parsed = JSON.parse(content);
+
+    // Minimal runtime validation to avoid silent failures from malformed or
+    // outdated config files. We check required fields and types.
+    function isValidSavedConfig(obj: unknown): obj is ServerConfig {
+      if (typeof obj !== 'object' || obj === null) return false;
+      const s = obj as any;
+      if (typeof s.typesDir !== 'string') return false;
+      if (typeof s.port !== 'number') return false;
+      if (typeof s.hotReload !== 'boolean') return false;
+      if (typeof s.cache !== 'boolean') return false;
+      if (typeof s.verbose !== 'boolean') return false;
+      if (s.latency !== undefined) {
+        if (typeof s.latency !== 'object' || s.latency === null) return false;
+        if (typeof s.latency.min !== 'number' || typeof s.latency.max !== 'number') return false;
+      }
+      return true;
+    }
+
+    if (!isValidSavedConfig(parsed)) {
+      logger.warn(`Saved configuration at ${CONFIG_FILE} is malformed or missing required fields — ignoring.`);
+      return null;
+    }
+
+    const saved = parsed as ServerConfig;
 
     // Convert relative paths back to absolute
+    const resolvedTypesDir = path.resolve(process.cwd(), saved.typesDir);
+
+    if (!fs.existsSync(resolvedTypesDir) || !fs.statSync(resolvedTypesDir).isDirectory()) {
+      logger.warn(`Saved configuration's typesDir does not exist: ${resolvedTypesDir} — ignoring saved config.`);
+      return null;
+    }
+
     return {
       ...saved,
-      typesDir: path.resolve(process.cwd(), saved.typesDir),
+      typesDir: resolvedTypesDir,
     };
   } catch (error) {
     logger.warn(`Failed to load saved configuration: ${error}`);

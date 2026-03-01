@@ -60,12 +60,34 @@ export function extractInterfaceNames(filePath: string): InterfaceMetadata[] {
     if (interfaceMatch && interfaceMatch[1]) {
       const interfaceName = interfaceMatch[1];
       
-      // Check the previous line for // @endpoint flag
+      // Check preceding lines for @endpoint flag, skipping blank lines and comments
       let hasEndpointFlag = false;
       if (i > 0) {
-        const prevLine = (lines[i - 1] || '').trim();
-        if (prevLine === '// @endpoint') {
-          hasEndpointFlag = true;
+        const maxLookback = 10;
+        for (let j = i - 1; j >= 0 && i - j <= maxLookback; j--) {
+          const prevLineRaw = lines[j] || '';
+          const prevLine = prevLineRaw.trim();
+          // Skip empty lines
+          if (prevLine === '') {
+            continue;
+          }
+          const isLineComment = prevLine.startsWith('//');
+          const isBlockCommentPart =
+            prevLine.startsWith('/**') ||
+            prevLine.startsWith('/*') ||
+            prevLine.startsWith('*') ||
+            prevLine.startsWith('*/');
+          if (isLineComment || isBlockCommentPart) {
+            // Treat any comment line containing @endpoint as the flag
+            if (prevLine.includes('@endpoint')) {
+              hasEndpointFlag = true;
+              break;
+            }
+            // Continue scanning upwards through comment/JSDoc lines
+            continue;
+          }
+          // Reached a non-comment, non-blank line; stop scanning
+          break;
         }
       }
 
@@ -96,9 +118,6 @@ export function buildTypeMap(directory: string): Map<string, string> {
       // Only include interfaces marked with // @endpoint
       if (metadata.hasEndpointFlag && !typeMap.has(metadata.name)) {
         typeMap.set(metadata.name, file);
-      } else if (!metadata.hasEndpointFlag) {
-        // Debug: Log interfaces without @endpoint flag
-        // console.debug(`[typeMapping] Interface "${metadata.name}" in ${file} does not have @endpoint flag`);
       }
     }
   }

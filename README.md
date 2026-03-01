@@ -309,7 +309,6 @@ ts-mock-proxy/
 │   ├── core/
 │   │   ├── parser.ts         # Type extraction with Intermock
 │   │   ├── router.ts         # Dynamic routing and URL <-> Type matching
-│   │   ├── proxy.ts          # (removed) previously: fallback logic to real backend
 │   │   ├── cache.ts          # In-memory cache for TypeScript schemas
 │   │   └── swagger.ts        # OpenAPI spec generation from TypeScript interfaces
 │   ├── middlewares/

@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import chalk from 'chalk';
 import { ServerConfig } from '../types/config';
 import { logger } from '../utils/logger';
-import { loadSavedConfig, saveConfig, hasSavedConfig } from '../utils/configPersistence';
+import { loadSavedConfig, saveConfig } from '../utils/configPersistence';
 
 /**
  * Display a welcome message for the interactive wizard
@@ -25,7 +25,7 @@ export async function runWizard(): Promise<ServerConfig> {
   try {
     // Check if a saved configuration exists and offer to reuse it
     const savedConfig = loadSavedConfig();
-    if (savedConfig && hasSavedConfig()) {
+    if (savedConfig) {
       const useExisting = await inquirer.prompt([
         {
           type: 'confirm',
@@ -249,7 +249,7 @@ export async function runWizard(): Promise<ServerConfig> {
  */
 function displayConfigSummary(config: ServerConfig): void {
   console.log('');
-  console.log(chalk.bold('\n📋 Configuration Summary:'));
+  console.log(chalk.bold('📋 Configuration Summary:'));
   console.log(chalk.gray('─'.repeat(50)));
 
   console.log(`  ${chalk.cyan('Port:')} ${config.port}`);

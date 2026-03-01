@@ -1,11 +1,10 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import chalk from 'chalk';
 import { logger } from '../utils/logger';
 
 /**
  * Validate and resolve the types directory
- * Ensures the directory exists and contains at least one TypeScript file
+ * Ensures the directory exists and is readable
  */
 export async function validateTypesDir(dirPath: string): Promise<string> {
   const resolvedPath = path.resolve(process.cwd(), dirPath);
@@ -54,51 +53,16 @@ export function parseLatency(latencyStr?: string): { min: number; max: number } 
 }
 
 /**
- * Display usage help for the CLI
- */
-export function displayHelp(): void {
-  console.log('');
-  console.log(chalk.bold('Usage:'));
-  console.log('  ts-mock-proxy --types-dir <path> [options]');
-  console.log('  ts-mock-proxy --interactive (force interactive mode)');
-  console.log('');
-  console.log(chalk.bold('Options:'));
-  console.log('  -t, --types-dir <path>      Directory containing TypeScript type definitions (required)');
-  console.log('  -p, --port <number>         Server port (default: 8080)');
-  console.log('  -l, --latency <range>       Simulate latency, format: "min-max" (e.g., "500-2000")');
-  console.log('  --no-hot-reload             Disable hot-reload of type definitions');
-  console.log('  --no-cache                  Disable schema caching');
-  console.log('  -v, --verbose               Enable verbose logging');
-  console.log('  --help                      Display this help message');
-  console.log('  --version                   Show version');
-  console.log('');
-  console.log(chalk.bold('Commands:'));
-  console.log('  stats                       Display cache statistics');
-  console.log('  clear-cache                 Clear the schema cache');
-  console.log('');
-  console.log(chalk.bold('Examples:'));
-  console.log('  # Interactive mode (default)');
-  console.log('  ts-mock-proxy');
-  console.log('');
-  console.log('  # Using CLI options (skips interactive mode)');
-  console.log('  ts-mock-proxy --types-dir ./my-types --port 3000');
-  console.log('');
-  console.log('  # With latency simulation');
-  console.log('  ts-mock-proxy --types-dir ./my-types --latency 500-2000');
-  console.log('');
-}
-
-/**
  * Display startup success message
  */
 export function displayStartupSuccess(port: number, typesDir: string): void {
   console.log('');
-  console.log(chalk.green.bold('✨ Server is running!'));
+  console.log('✨ Server is running!');
   console.log('');
-  console.log(`  ${chalk.cyan('Local:')} http://localhost:${port}`);
-  console.log(`  ${chalk.cyan('Types:')} ${typesDir}`);
-  console.log(`  ${chalk.cyan('API Docs:')} http://localhost:${port}/api-docs`);
+  console.log(`  Local: http://localhost:${port}`);
+  console.log(`  Types: ${typesDir}`);
+  console.log(`  API Docs: http://localhost:${port}/api-docs`);
   console.log('');
-  console.log(chalk.gray('Press Ctrl+C to stop the server'));
+  console.log('Press Ctrl+C to stop the server');
   console.log('');
 }

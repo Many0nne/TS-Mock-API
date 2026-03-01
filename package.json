@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
-    "dev:external": "tsx src/index.ts --external-dir ../external-api-types --verbose",
+    "dev:external": "tsx src/index.ts --types-dir ../external-api-types --verbose",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
@@ -34,7 +34,6 @@
     "commander": "^12.0.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    
     "inquirer": "^8.2.7",
     "intermock": "^0.2.5",
     "pluralize": "^8.0.0",

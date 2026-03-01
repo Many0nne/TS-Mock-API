@@ -17,19 +17,14 @@ async function main() {
 
   // If no explicit CLI args, run interactive wizard
   if (!hasCliArgs) {
+    const config = await runWizard();
     try {
-      const config = await runWizard();
-      try {
-        startServer(config);
-      } catch (error) {
-        logger.error('Failed to start server:', error);
-        process.exit(1);
-      }
-      return;
+      startServer(config);
     } catch (error) {
-      logger.error('Wizard cancelled or failed:', error);
+      logger.error('Failed to start server:', error);
       process.exit(1);
     }
+    return;
   }
 
   // Setup Commander for CLI mode
