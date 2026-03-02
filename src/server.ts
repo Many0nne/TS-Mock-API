@@ -80,6 +80,7 @@ export function startServer(
 
   // Configure the logger in verbose mode if necessary
   if (config.verbose) {
+    logger.setVerbose(true);
     logger.info('Verbose mode enabled');
   }
 

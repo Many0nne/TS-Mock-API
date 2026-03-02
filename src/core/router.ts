@@ -46,8 +46,18 @@ export function dynamicRouteHandler(config: ServerConfig) {
       // Check the cache first (only for single objects, not arrays)
       let mockData: Record<string, unknown> | Record<string, unknown>[];
 
-      if (config.cache && mapping.filePath && !mapping.isArray) {
-        const cached = schemaCache.get(mapping.typeName, mapping.filePath);
+      const { filePath } = mapping;
+
+      if (!filePath) {
+        res.status(500).json({
+          error: 'Mock generation failed',
+          message: `No file path found for type "${mapping.typeName}"`,
+        });
+        return;
+      }
+
+      if (config.cache && !mapping.isArray) {
+        const cached = schemaCache.get(mapping.typeName, filePath);
 
         if (cached) {
           mockData = cached.schema;
@@ -59,21 +69,21 @@ export function dynamicRouteHandler(config: ServerConfig) {
       // Generate the mock data
       if (mapping.isArray) {
         mockData = generateMockArray(
-          mapping.filePath!,
+          filePath,
           mapping.typeName
         );
       } else {
         mockData = generateMockFromInterface(
-          mapping.filePath!,
+          filePath,
           mapping.typeName
         );
       }
 
       // Store in cache if enabled
-      if (config.cache && mapping.filePath && !mapping.isArray) {
+      if (config.cache && !mapping.isArray) {
         schemaCache.set(
           mapping.typeName,
-          mapping.filePath,
+          filePath,
           mockData as Record<string, unknown>
         );
       }

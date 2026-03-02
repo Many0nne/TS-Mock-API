@@ -122,11 +122,6 @@ export function buildTypeMap(directory: string): Map<string, string> {
     }
   }
 
-  if (typeMap.size > 0) {
-    // Debug: Log discovered endpoints
-    // console.debug(`[typeMapping] Discovered ${typeMap.size} endpoints:`, Array.from(typeMap.keys()));
-  }
-
   return typeMap;
 }
 
