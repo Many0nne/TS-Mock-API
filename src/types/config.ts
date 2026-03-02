@@ -8,7 +8,6 @@ export interface ServerConfig {
   /** Server port */
   port: number;
 
-
   /** Simulated latency (min-max in milliseconds) */
   latency?: {
     min: number;

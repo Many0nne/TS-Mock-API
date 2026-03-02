@@ -3,6 +3,10 @@ import chalk from 'chalk';
 export class Logger {
   constructor(private verbose: boolean = false) {}
 
+  setVerbose(verbose: boolean): void {
+    this.verbose = verbose;
+  }
+
   info(message: string, ...args: unknown[]): void {
     console.log(chalk.blue('ℹ'), message, ...args);
   }

@@ -53,7 +53,7 @@ npm run dev
 npx ts-mock-proxy
 ```
 
-Y ou'll be prompted for:
+You'll be prompted for:
 - Types directory location
 - Server port (default: 8080)
 - Optional features (hot-reload, caching, latency simulation)
