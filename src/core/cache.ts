@@ -153,6 +153,25 @@ export class MockDataStore {
     this.pools.set(this.key(typeName, filePath), { data, createdAt: Date.now() });
   }
 
+  invalidateFile(filePath: string): void {
+    let count = 0;
+    for (const key of this.singles.keys()) {
+      if (key.startsWith(`${filePath}::`)) {
+        this.singles.delete(key);
+        count++;
+      }
+    }
+    for (const key of this.pools.keys()) {
+      if (key.startsWith(`${filePath}::`)) {
+        this.pools.delete(key);
+        count++;
+      }
+    }
+    if (count > 0) {
+      logger.info(`MockDataStore invalidated: ${count} entry/entries from ${filePath}`);
+    }
+  }
+
   clear(): { singles: number; pools: number } {
     const singles = this.singles.size;
     const pools = this.pools.size;

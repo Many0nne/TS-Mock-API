@@ -104,8 +104,9 @@ window.addEventListener('load', function () {
 
   // Mock data reset endpoint
   app.post('/mock-reset', (_req, res) => {
-    const cleared = mockDataStore.clear();
-    res.json({ message: 'Mock data store cleared', cleared });
+    const mockCleared = mockDataStore.clear();
+    schemaCache.clear();
+    res.json({ message: 'Mock data store cleared', cleared: mockCleared });
   });
 
   // Swagger documentation - use app.locals.swaggerSpec for dynamic updates
