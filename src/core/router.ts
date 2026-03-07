@@ -74,10 +74,18 @@ export function dynamicRouteHandler(config: ServerConfig) {
 
       // Generate the mock data
       if (mapping.isArray) {
+        // Sanitize req.query: drop nested objects that parseQueryParams can't handle
+        const sanitizedQuery: Record<string, string | string[] | undefined> = {};
+        for (const [key, value] of Object.entries(req.query)) {
+          if (typeof value === 'string' || value === undefined) {
+            sanitizedQuery[key] = value;
+          } else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+            sanitizedQuery[key] = value as string[];
+          }
+        }
+
         // Parse and validate query parameters
-        const parsed = parseQueryParams(
-          req.query as Record<string, string | string[] | undefined>
-        );
+        const parsed = parseQueryParams(sanitizedQuery);
         if ('error' in parsed) {
           res.status(400).json({ error: 'Invalid query parameters', message: parsed.error });
           return;

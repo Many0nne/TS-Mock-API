@@ -153,8 +153,16 @@ function matchesExact(
   const v = getFieldValue(item, field);
   if (v === undefined) return true; // unknown field — no constraint
   if (typeof v === 'string') return v.toLowerCase() === value.toLowerCase();
-  if (typeof v === 'boolean') return v === (value.toLowerCase() === 'true');
-  if (typeof v === 'number') return v === Number(value);
+  if (typeof v === 'boolean') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== 'true' && normalized !== 'false') return true; // invalid — ignore constraint
+    return v === (normalized === 'true');
+  }
+  if (typeof v === 'number') {
+    const numValue = Number(value);
+    if (Number.isNaN(numValue)) return true; // invalid — ignore constraint
+    return v === numValue;
+  }
   return String(v) === value;
 }
 
