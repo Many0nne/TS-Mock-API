@@ -1,4 +1,4 @@
-import { SchemaCache } from '../../src/core/cache';
+import { SchemaCache, MockDataStore } from '../../src/core/cache';
 
 describe('SchemaCache', () => {
   let cache: SchemaCache;
@@ -156,6 +156,92 @@ describe('SchemaCache', () => {
 
       expect(stats.size).toBe(0);
       expect(stats.schemas).toEqual([]);
+    });
+  });
+});
+
+describe('MockDataStore', () => {
+  let store: MockDataStore;
+
+  beforeEach(() => {
+    store = new MockDataStore();
+  });
+
+  describe('getSingle and setSingle', () => {
+    it('should store and retrieve a single', () => {
+      const data = { id: 1, name: 'Alice' };
+      store.setSingle('User', '/path/user.ts', data);
+      expect(store.getSingle('User', '/path/user.ts')).toEqual(data);
+    });
+
+    it('should return undefined for non-existent single', () => {
+      expect(store.getSingle('User', '/path/user.ts')).toBeUndefined();
+    });
+
+    it('should scope by filePath and typeName', () => {
+      store.setSingle('User', '/path/a.ts', { id: 1 });
+      store.setSingle('User', '/path/b.ts', { id: 2 });
+      expect(store.getSingle('User', '/path/a.ts')).toEqual({ id: 1 });
+      expect(store.getSingle('User', '/path/b.ts')).toEqual({ id: 2 });
+    });
+  });
+
+  describe('getPool and setPool', () => {
+    it('should store and retrieve a pool', () => {
+      const pool = [{ id: 1 }, { id: 2 }];
+      store.setPool('User', '/path/user.ts', pool);
+      expect(store.getPool('User', '/path/user.ts')).toEqual(pool);
+    });
+
+    it('should return undefined for non-existent pool', () => {
+      expect(store.getPool('User', '/path/user.ts')).toBeUndefined();
+    });
+  });
+
+  describe('clear', () => {
+    it('should clear all entries and return counts', () => {
+      store.setSingle('User', '/path/user.ts', { id: 1 });
+      store.setPool('Product', '/path/product.ts', [{ id: 2 }]);
+
+      const result = store.clear();
+
+      expect(result).toEqual({ singles: 1, pools: 1 });
+      expect(store.getSingle('User', '/path/user.ts')).toBeUndefined();
+      expect(store.getPool('Product', '/path/product.ts')).toBeUndefined();
+    });
+
+    it('should return zero counts when already empty', () => {
+      expect(store.clear()).toEqual({ singles: 0, pools: 0 });
+    });
+  });
+
+  describe('invalidateFile', () => {
+    it('should remove singles and pools for a given file', () => {
+      store.setSingle('User', '/path/types.ts', { id: 1 });
+      store.setPool('User', '/path/types.ts', [{ id: 1 }]);
+      store.setSingle('Product', '/path/other.ts', { id: 2 });
+
+      store.invalidateFile('/path/types.ts');
+
+      expect(store.getSingle('User', '/path/types.ts')).toBeUndefined();
+      expect(store.getPool('User', '/path/types.ts')).toBeUndefined();
+      expect(store.getSingle('Product', '/path/other.ts')).toEqual({ id: 2 });
+    });
+
+    it('should not throw when file has no entries', () => {
+      expect(() => store.invalidateFile('/path/nonexistent.ts')).not.toThrow();
+    });
+  });
+
+  describe('getStats', () => {
+    it('should return correct counts', () => {
+      store.setSingle('User', '/path/user.ts', { id: 1 });
+      store.setPool('Product', '/path/product.ts', [{ id: 2 }]);
+      expect(store.getStats()).toEqual({ singles: 1, pools: 1 });
+    });
+
+    it('should return zeros when empty', () => {
+      expect(store.getStats()).toEqual({ singles: 0, pools: 0 });
     });
   });
 });

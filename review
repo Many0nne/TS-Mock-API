@@ -1,0 +1,104 @@
+Pull request overview
+This PR introduces an always-on mock data caching layer (MockDataStore) so that generated mock data remains stable across requests (instead of being regenerated each time), and adds a "Rebuild Data" button to the Swagger UI that allows users to clear the cached mock data and regenerate it on the next request.
+
+Changes:
+
+Added MockDataStore class in cache.ts that caches both single-object mocks and array pools, independent of the config.cache setting.
+Integrated mockDataStore into the route handler (router.ts) to serve cached mock data on subsequent requests and regenerate only on first access.
+Added a /mock-reset POST endpoint and a custom Swagger UI toolbar with a "Rebuild Data" button that triggers cache clearing.
+Reviewed changes
+Copilot reviewed 4 out of 4 changed files in this pull request and generated 3 comments.
+
+File	Description
+src/core/cache.ts	New MockDataStore class with singles/pools Maps, get/set/clear/getStats methods, and a global mockDataStore singleton.
+src/core/router.ts	Updated dynamic route handler to check mockDataStore before generating new mock data for both array and single-object endpoints.
+src/server.ts	Added /swagger-rebuild.js endpoint serving custom JS for the toolbar button, /mock-reset POST endpoint, and wired custom JS into Swagger UI setup.
+src/core/swagger.ts	Added OpenAPI spec entry for the /mock-reset endpoint.
+💡 Add Copilot custom instructions for smarter, more guided reviews. Learn how to get started.
+
+src/server.ts
+Comment on lines +107 to +108
+    const cleared = mockDataStore.clear();
+    res.json({ message: 'Mock data store cleared', cleared });
+Copilot AI
+5 minutes ago
+Bug: When config.cache is enabled, the schemaCache is checked before mockDataStore for single-object endpoints (lines 65-72 of router.ts). The /mock-reset endpoint only clears mockDataStore but does not clear schemaCache. This means after clicking "Rebuild Data", single-object endpoints will continue to serve the old cached data from schemaCache, making the reset appear broken for those endpoints.
+
+You should also call schemaCache.clear() in the /mock-reset handler.
+
+Suggested change
+    const cleared = mockDataStore.clear();
+    res.json({ message: 'Mock data store cleared', cleared });
+    const mockCleared = mockDataStore.clear();
+    const schemaCleared = schemaCache.clear();
+    res.json({
+      message: 'Mock data store cleared',
+      cleared: {
+        mockDataStore: mockCleared,
+        schemaCache: schemaCleared,
+      },
+    });
+Copilot uses AI. Check for mistakes.
+@Many0nne	Reply...
+src/core/router.ts
+Comment on lines +94 to +99
+        // Use stable pool from the data store; generate and cache on first request
+        let pool = mockDataStore.getPool(mapping.typeName, filePath);
+        if (!pool) {
+          pool = generateMockArray(filePath, mapping.typeName, { arrayLength: POOL_SIZE });
+          mockDataStore.setPool(mapping.typeName, filePath, pool);
+        }
+Copilot AI
+5 minutes ago
+Bug: The file watcher invalidates schemaCache on file changes (see src/utils/fileWatcher.ts:32,50) but does not invalidate mockDataStore. When hot-reload is enabled and a type file is modified, mockDataStore will continue serving stale mock data because the mockDataStore cache hit (line 95-99 for arrays, line 115-118 for singles) happens before any generation, and the stale entries are never removed.
+
+mockDataStore should also be invalidated when type files change. Consider adding an invalidateFile method to MockDataStore (similar to SchemaCache.invalidateFile) and calling it from the file watcher.
+
+Copilot uses AI. Check for mistakes.
+@Many0nne	Reply...
+src/core/cache.ts
+Comment on lines +132 to +170
+export class MockDataStore {
+  private singles: Map<string, MockEntry<Record<string, unknown>>> = new Map();
+  private pools: Map<string, MockEntry<Record<string, unknown>[]>> = new Map();
+
+  private key(typeName: string, filePath: string): string {
+    return `${filePath}::${typeName}`;
+  }
+
+  getSingle(typeName: string, filePath: string): Record<string, unknown> | undefined {
+    return this.singles.get(this.key(typeName, filePath))?.data;
+  }
+
+  setSingle(typeName: string, filePath: string, data: Record<string, unknown>): void {
+    this.singles.set(this.key(typeName, filePath), { data, createdAt: Date.now() });
+  }
+
+  getPool(typeName: string, filePath: string): Record<string, unknown>[] | undefined {
+    return this.pools.get(this.key(typeName, filePath))?.data;
+  }
+
+  setPool(typeName: string, filePath: string, data: Record<string, unknown>[]): void {
+    this.pools.set(this.key(typeName, filePath), { data, createdAt: Date.now() });
+  }
+
+  clear(): { singles: number; pools: number } {
+    const singles = this.singles.size;
+    const pools = this.pools.size;
+    this.singles.clear();
+    this.pools.clear();
+    logger.info(`MockDataStore cleared: ${singles} single(s), ${pools} pool(s)`);
+    return { singles, pools };
+  }
+
+  getStats(): { singles: number; pools: number } {
+    return { singles: this.singles.size, pools: this.pools.size };
+  }
+}
+
+export const mockDataStore = new MockDataStore();
+Copilot AI
+5 minutes ago
+The MockDataStore class is missing tests. The existing tests/core/cache.test.ts comprehensively tests SchemaCache (get/set, invalidateFile, clear, size, getStats). Since MockDataStore is in the same file and follows a similar pattern, it should have analogous test coverage—especially for getSingle/setSingle, getPool/setPool, clear (including its return value), and getStats.
+
+Copilot uses AI. Check for mistakes.

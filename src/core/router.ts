@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { ServerConfig } from '../types/config';
 import { findTypeForUrl } from '../utils/typeMapping';
 import { generateMockFromInterface, generateMockArray } from './parser';
-import { schemaCache } from './cache';
+import { schemaCache, mockDataStore } from './cache';
 import { logger } from '../utils/logger';
 import {
   parseQueryParams,
@@ -91,10 +91,12 @@ export function dynamicRouteHandler(config: ServerConfig) {
           return;
         }
 
-        // Generate a fixed pool to simulate a full dataset
-        const pool = generateMockArray(filePath, mapping.typeName, {
-          arrayLength: POOL_SIZE,
-        });
+        // Use stable pool from the data store; generate and cache on first request
+        let pool = mockDataStore.getPool(mapping.typeName, filePath);
+        if (!pool) {
+          pool = generateMockArray(filePath, mapping.typeName, { arrayLength: POOL_SIZE });
+          mockDataStore.setPool(mapping.typeName, filePath, pool);
+        }
 
         // Validate sort fields against schema keys
         if (parsed.sort.length > 0 && pool.length > 0) {
@@ -109,13 +111,17 @@ export function dynamicRouteHandler(config: ServerConfig) {
         res.status(forcedStatus || 200).json(applyPagination(pool, parsed));
         return;
       } else {
-        mockData = generateMockFromInterface(
-          filePath,
-          mapping.typeName
-        );
+        // Use stable single from the data store; generate and cache on first request
+        const stored = mockDataStore.getSingle(mapping.typeName, filePath);
+        if (stored) {
+          res.status(forcedStatus || 200).json(stored);
+          return;
+        }
+        mockData = generateMockFromInterface(filePath, mapping.typeName);
+        mockDataStore.setSingle(mapping.typeName, filePath, mockData as Record<string, unknown>);
       }
 
-      // Store in cache if enabled
+      // Store in schema cache too if enabled
       if (config.cache && !mapping.isArray) {
         schemaCache.set(
           mapping.typeName,

@@ -8,7 +8,7 @@ import { latencyMiddleware } from './middlewares/latency';
 import { statusOverrideMiddleware } from './middlewares/statusOverride';
 import { dynamicRouteHandler } from './core/router';
 import { startFileWatcher } from './utils/fileWatcher';
-import { schemaCache } from './core/cache';
+import { schemaCache, mockDataStore } from './core/cache';
 import { generateOpenAPISpec } from './core/swagger';
 import type { FSWatcher } from 'chokidar';
 
@@ -53,12 +53,69 @@ export function createServer(config: ServerConfig): Express {
     });
   });
 
+  // Custom JS injected into Swagger UI — adds a "Rebuild Data" button
+  app.get('/swagger-rebuild.js', (_req, res) => {
+    res.type('js').send(`
+window.addEventListener('load', function () {
+  var interval = setInterval(function () {
+    var container = document.getElementById('swagger-ui');
+    if (!container) return;
+    clearInterval(interval);
+
+    var toolbar = document.createElement('div');
+    toolbar.style.cssText = 'background:#1b1b1b;padding:8px 20px;display:flex;align-items:center;gap:12px;';
+
+    var label = document.createElement('span');
+    label.textContent = 'TS Mock API';
+    label.style.cssText = 'color:#fff;font-family:sans-serif;font-size:15px;font-weight:700;flex:1;';
+
+    var btn = document.createElement('button');
+    btn.textContent = 'Rebuild Data';
+    btn.title = 'Clear all cached mock data and regenerate on next requests';
+    btn.style.cssText = 'background:#49cc90;color:#fff;border:none;padding:6px 18px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700;font-family:sans-serif;';
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Resetting\u2026';
+      fetch('/mock-reset', { method: 'POST' })
+        .then(function (r) { return r.json(); })
+        .then(function () {
+          btn.textContent = 'Done! Reloading\u2026';
+          setTimeout(function () { location.reload(); }, 600);
+        })
+        .catch(function () {
+          btn.style.background = '#f93e3e';
+          btn.textContent = 'Error \u2014 try again';
+          btn.disabled = false;
+          setTimeout(function () {
+            btn.style.background = '#49cc90';
+            btn.textContent = 'Rebuild Data';
+          }, 2500);
+        });
+    });
+
+    toolbar.appendChild(label);
+    toolbar.appendChild(btn);
+    container.parentNode.insertBefore(toolbar, container);
+  }, 100);
+});
+`);
+  });
+
+  // Mock data reset endpoint
+  app.post('/mock-reset', (_req, res) => {
+    const mockCleared = mockDataStore.clear();
+    schemaCache.clear();
+    res.json({ message: 'Mock data store cleared', cleared: mockCleared });
+  });
+
   // Swagger documentation - use app.locals.swaggerSpec for dynamic updates
   app.use('/api-docs', swaggerUi.serve, (req: Request, res: Response, next: NextFunction) => {
     const spec = app.locals.swaggerSpec || swaggerSpec;
     swaggerUi.setup(spec, {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'TS Mock Proxy API Docs',
+      customJs: '/swagger-rebuild.js',
     })(req, res, next);
   });
 
