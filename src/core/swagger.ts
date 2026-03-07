@@ -297,6 +297,38 @@ export function generateOpenAPISpec(config: ServerConfig): Record<string, unknow
     };
   });
 
+  // Add mock-reset endpoint
+  paths['/mock-reset'] = {
+    post: {
+      summary: 'Rebuild mock data',
+      description:
+        'Clears all cached mock data (single objects and array pools). ' +
+        'Fresh data is regenerated on the next requests.',
+      responses: {
+        '200': {
+          description: 'Data store cleared',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  message: { type: 'string' },
+                  cleared: {
+                    type: 'object',
+                    properties: {
+                      singles: { type: 'integer', description: 'Number of single-object entries cleared' },
+                      pools: { type: 'integer', description: 'Number of array pool entries cleared' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
   // Add health endpoint
   paths['/health'] = {
     get: {
