@@ -17,7 +17,7 @@ import {
 export function dynamicRouteHandler(config: ServerConfig) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const url = req.url;
+      const url = req.path;
 
       // Search for the type corresponding to the URL
       const mapping = findTypeForUrl(url, config.typesDir);

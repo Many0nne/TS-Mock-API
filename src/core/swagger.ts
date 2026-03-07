@@ -3,6 +3,7 @@ import { ServerConfig } from '../types/config';
 import { buildTypeMap } from '../utils/typeMapping';
 import pluralize from 'pluralize';
 import { toPascalCase } from '../utils/pluralize';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './queryProcessor';
 
 interface OpenAPISchema {
   type: string;
@@ -12,9 +13,20 @@ interface OpenAPISchema {
   enum?: string[];
 }
 
+type OpenAPIParameter =
+  | { $ref: string }
+  | {
+      name: string;
+      in: string;
+      description: string;
+      required: boolean;
+      schema: Record<string, unknown>;
+    };
+
 interface OpenAPIPath {
   summary: string;
   description: string;
+  parameters?: OpenAPIParameter[];
   responses: {
     [statusCode: string]: {
       description: string;
@@ -25,13 +37,6 @@ interface OpenAPIPath {
       };
     };
   };
-  parameters?: Array<{
-    name: string;
-    in: string;
-    description: string;
-    required: boolean;
-    schema: { type: string };
-  }>;
 }
 
 /**
@@ -130,6 +135,69 @@ function interfaceNameToPath(interfaceName: string): string {
 }
 
 /**
+ * Builds the list of query parameters for an array endpoint:
+ * standard pagination/sort refs + field-specific filter parameters.
+ */
+function buildListParameters(
+  properties: Record<string, OpenAPISchema>
+): OpenAPIParameter[] {
+  const params: OpenAPIParameter[] = [
+    { $ref: '#/components/parameters/page' },
+    { $ref: '#/components/parameters/pageSize' },
+    { $ref: '#/components/parameters/sort' },
+  ];
+
+  for (const [field, schema] of Object.entries(properties)) {
+    const isDate = schema.format === 'date-time';
+    const isString = schema.type === 'string' && !isDate;
+    const isNumber = schema.type === 'number';
+    const isBoolean = schema.type === 'boolean';
+
+    // Exact match — works for string, number, boolean
+    if (isString || isNumber || isBoolean || isDate) {
+      params.push({
+        name: field,
+        in: 'query',
+        description: `Exact match filter on \`${field}\``,
+        required: false,
+        schema: isDate ? { type: 'string', format: 'date-time' } : { type: schema.type },
+      });
+    }
+
+    // _like — substring match (non-date strings only)
+    if (isString) {
+      params.push({
+        name: `${field}_like`,
+        in: 'query',
+        description: `Case-insensitive substring filter on \`${field}\``,
+        required: false,
+        schema: { type: 'string' },
+      });
+    }
+
+    // _from / _to — range filters for dates
+    if (isDate) {
+      params.push({
+        name: `${field}_from`,
+        in: 'query',
+        description: `Return items where \`${field}\` is on or after this date (ISO 8601)`,
+        required: false,
+        schema: { type: 'string', format: 'date-time' },
+      });
+      params.push({
+        name: `${field}_to`,
+        in: 'query',
+        description: `Return items where \`${field}\` is on or before this date (ISO 8601)`,
+        required: false,
+        schema: { type: 'string', format: 'date-time' },
+      });
+    }
+  }
+
+  return params;
+}
+
+/**
  * Generates OpenAPI specification from TypeScript interfaces
  */
 export function generateOpenAPISpec(config: ServerConfig): Record<string, unknown> {
@@ -157,41 +225,48 @@ export function generateOpenAPISpec(config: ServerConfig): Record<string, unknow
       explicitPluralTypeName !== interfaceName && typeMap.has(explicitPluralTypeName);
 
     if (!hasExplicitPlural) {
-    paths[arrayPath] = {
-      get: {
-        summary: `Get all ${pluralize(interfaceName)}`,
-        description: `Returns an array of ${interfaceName} objects`,
-        responses: {
-          '200': {
-            description: 'Successful response',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'array',
-                  items: {
-                    $ref: `#/components/schemas/${interfaceName}`,
+      paths[arrayPath] = {
+        get: {
+          summary: `List ${pluralize(interfaceName)}`,
+          description: `Returns a paginated list of \`${interfaceName}\` objects. Supports filtering, sorting, and pagination via query parameters.`,
+          parameters: buildListParameters(properties),
+          responses: {
+            '200': {
+              description: 'Successful response',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      data: {
+                        type: 'array',
+                        items: { $ref: `#/components/schemas/${interfaceName}` },
+                      },
+                      meta: { $ref: '#/components/schemas/PaginationMeta' },
+                    },
                   },
                 },
               },
             },
-          },
-          '404': {
-            description: 'Type not found',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    error: { type: 'string' },
-                    message: { type: 'string' },
-                  },
+            '400': {
+              description: 'Invalid query parameters',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '404': {
+              description: 'Type not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
                 },
               },
             },
           },
         },
-      },
-    };
+      };
     }
 
     // Generate path for single item endpoint
@@ -199,15 +274,13 @@ export function generateOpenAPISpec(config: ServerConfig): Record<string, unknow
     paths[singularPath] = {
       get: {
         summary: `Get a single ${interfaceName}`,
-        description: `Returns a single ${interfaceName} object`,
+        description: `Returns a single \`${interfaceName}\` object`,
         responses: {
           '200': {
             description: 'Successful response',
             content: {
               'application/json': {
-                schema: {
-                  $ref: `#/components/schemas/${interfaceName}`,
-                },
+                schema: { $ref: `#/components/schemas/${interfaceName}` },
               },
             },
           },
@@ -215,13 +288,7 @@ export function generateOpenAPISpec(config: ServerConfig): Record<string, unknow
             description: 'Type not found',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    error: { type: 'string' },
-                    message: { type: 'string' },
-                  },
-                },
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
               },
             },
           },
@@ -271,17 +338,55 @@ export function generateOpenAPISpec(config: ServerConfig): Record<string, unknow
     ],
     paths,
     components: {
-      schemas,
+      schemas: {
+        ...schemas,
+        PaginationMeta: {
+          type: 'object',
+          properties: {
+            total: { type: 'integer', description: 'Total number of items matching the filters' },
+            page: { type: 'integer', description: 'Current page number' },
+            pageSize: { type: 'integer', description: 'Number of items per page' },
+            totalPages: { type: 'integer', description: 'Total number of pages' },
+          },
+        },
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
       parameters: {
         'x-mock-status': {
           name: 'x-mock-status',
           in: 'header',
-          description: 'Force a specific HTTP status code',
+          description: 'Force a specific HTTP status code for this request',
           required: false,
-          schema: {
-            type: 'integer',
-            example: 500,
-          },
+          schema: { type: 'integer', example: 500 },
+        },
+        page: {
+          name: 'page',
+          in: 'query',
+          description: 'Page number (1-based)',
+          required: false,
+          schema: { type: 'integer', minimum: 1, default: 1 },
+        },
+        pageSize: {
+          name: 'pageSize',
+          in: 'query',
+          description: `Number of items per page (max ${MAX_PAGE_SIZE})`,
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE },
+        },
+        sort: {
+          name: 'sort',
+          in: 'query',
+          description:
+            'Comma-separated sort fields. Each entry is `field:asc` or `field:desc`. ' +
+            'Example: `sort=name:asc,createdAt:desc`',
+          required: false,
+          schema: { type: 'string', example: 'name:asc' },
         },
       },
     },
