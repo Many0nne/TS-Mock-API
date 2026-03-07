@@ -27,9 +27,9 @@ describe('parseQueryParams', () => {
       pageSize: DEFAULT_PAGE_SIZE,
       sort: [],
       exactFilters: {},
-      likeFilters: {},
-      fromFilters: {},
-      toFilters: {},
+      containsFilters: {},
+      gteFilters: {},
+      lteFilters: {},
     });
   });
 
@@ -97,20 +97,20 @@ describe('parseQueryParams', () => {
     }
   });
 
-  it('parses _like filters', () => {
-    const result = parseQueryParams({ email_like: '@example.com' });
+  it('parses _contains filters', () => {
+    const result = parseQueryParams({ email_contains: '@example.com' });
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.likeFilters).toEqual({ email: '@example.com' });
+      expect(result.containsFilters).toEqual({ email: '@example.com' });
     }
   });
 
-  it('parses _from and _to filters', () => {
-    const result = parseQueryParams({ createdAt_from: '2024-01-01', createdAt_to: '2024-12-31' });
+  it('parses _gte and _lte filters', () => {
+    const result = parseQueryParams({ createdAt_gte: '2024-01-01', createdAt_lte: '2024-12-31' });
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.fromFilters).toEqual({ createdAt: '2024-01-01' });
-      expect(result.toFilters).toEqual({ createdAt: '2024-12-31' });
+      expect(result.gteFilters).toEqual({ createdAt: '2024-01-01' });
+      expect(result.lteFilters).toEqual({ createdAt: '2024-12-31' });
     }
   });
 });
@@ -139,9 +139,9 @@ describe('applyPagination', () => {
     pageSize: DEFAULT_PAGE_SIZE,
     sort: [],
     exactFilters: {},
-    likeFilters: {},
-    fromFilters: {},
-    toFilters: {},
+    containsFilters: {},
+    gteFilters: {},
+    lteFilters: {},
   };
 
   describe('pagination', () => {
@@ -194,22 +194,22 @@ describe('applyPagination', () => {
       result.data.forEach((item) => expect(item['status']).toBe('active'));
     });
 
-    it('applies _like filter', () => {
+    it('applies _contains filter', () => {
       const pool = makeItems(10);
       const result = applyPagination(pool, {
         ...baseParams,
-        likeFilters: { email: '@example.com' },
+        containsFilters: { email: '@example.com' },
       });
       result.data.forEach((item) =>
         expect(String(item['email']).toLowerCase()).toContain('@example.com')
       );
     });
 
-    it('applies _from date filter', () => {
+    it('applies _gte date filter', () => {
       const pool = makeItems(10);
       const result = applyPagination(pool, {
         ...baseParams,
-        fromFilters: { createdAt: '2024-01-05' },
+        gteFilters: { createdAt: '2024-01-05' },
       });
       result.data.forEach((item) => {
         const d = new Date(String(item['createdAt']));
@@ -217,16 +217,34 @@ describe('applyPagination', () => {
       });
     });
 
-    it('applies _to date filter', () => {
+    it('applies _lte date filter', () => {
       const pool = makeItems(10);
       const result = applyPagination(pool, {
         ...baseParams,
-        toFilters: { createdAt: '2024-01-05' },
+        lteFilters: { createdAt: '2024-01-05' },
       });
       result.data.forEach((item) => {
         const d = new Date(String(item['createdAt']));
         expect(d <= new Date('2024-01-05')).toBe(true);
       });
+    });
+
+    it('applies _gte numeric filter', () => {
+      const pool = makeItems(10);
+      const result = applyPagination(pool, {
+        ...baseParams,
+        gteFilters: { score: '5' },
+      });
+      result.data.forEach((item) => expect(item['score'] as number).toBeGreaterThanOrEqual(5));
+    });
+
+    it('applies _lte numeric filter', () => {
+      const pool = makeItems(10);
+      const result = applyPagination(pool, {
+        ...baseParams,
+        lteFilters: { score: '5' },
+      });
+      result.data.forEach((item) => expect(item['score'] as number).toBeLessThanOrEqual(5));
     });
 
     it('returns empty data when no items match filter', () => {
