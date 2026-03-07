@@ -4,6 +4,12 @@ import { findTypeForUrl } from '../utils/typeMapping';
 import { generateMockFromInterface, generateMockArray } from './parser';
 import { schemaCache } from './cache';
 import { logger } from '../utils/logger';
+import {
+  parseQueryParams,
+  validateSortFields,
+  applyPagination,
+  POOL_SIZE,
+} from './queryProcessor';
 
 /**
  * Dynamic route handler - Matches the URL with a type and generates the mock
@@ -11,7 +17,7 @@ import { logger } from '../utils/logger';
 export function dynamicRouteHandler(config: ServerConfig) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const url = req.url;
+      const url = req.path;
 
       // Search for the type corresponding to the URL
       const mapping = findTypeForUrl(url, config.typesDir);
@@ -68,10 +74,40 @@ export function dynamicRouteHandler(config: ServerConfig) {
 
       // Generate the mock data
       if (mapping.isArray) {
-        mockData = generateMockArray(
-          filePath,
-          mapping.typeName
-        );
+        // Sanitize req.query: drop nested objects that parseQueryParams can't handle
+        const sanitizedQuery: Record<string, string | string[] | undefined> = {};
+        for (const [key, value] of Object.entries(req.query)) {
+          if (typeof value === 'string' || value === undefined) {
+            sanitizedQuery[key] = value;
+          } else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+            sanitizedQuery[key] = value as string[];
+          }
+        }
+
+        // Parse and validate query parameters
+        const parsed = parseQueryParams(sanitizedQuery);
+        if ('error' in parsed) {
+          res.status(400).json({ error: 'Invalid query parameters', message: parsed.error });
+          return;
+        }
+
+        // Generate a fixed pool to simulate a full dataset
+        const pool = generateMockArray(filePath, mapping.typeName, {
+          arrayLength: POOL_SIZE,
+        });
+
+        // Validate sort fields against schema keys
+        if (parsed.sort.length > 0 && pool.length > 0) {
+          const allowedFields = new Set(Object.keys(pool[0]!));
+          const sortError = validateSortFields(parsed.sort, allowedFields);
+          if (sortError) {
+            res.status(400).json({ error: 'Invalid sort parameter', message: sortError });
+            return;
+          }
+        }
+
+        res.status(forcedStatus || 200).json(applyPagination(pool, parsed));
+        return;
       } else {
         mockData = generateMockFromInterface(
           filePath,
