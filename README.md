@@ -144,17 +144,18 @@ GET /users?page=2&pageSize=50
 
 ### Filtering
 
-| Convention | Example | Description |
-|---|---|---|
-| `field=value` | `status=active` | Exact match (case-insensitive for strings) |
-| `field_like=value` | `email_like=@example.com` | Substring match (case-insensitive) |
-| `field_from=date` | `createdAt_from=2024-01-01` | Date range — start (inclusive) |
-| `field_to=date` | `createdAt_to=2024-12-31` | Date range — end (inclusive) |
+| Convention | Applies to | Example | Description |
+|---|---|---|---|
+| `field=value` | string, number, boolean | `status=active` | Exact match (case-insensitive for strings) |
+| `field_contains=value` | string | `email_contains=@example.com` | Substring match (case-insensitive) |
+| `field_gte=value` | number, date | `price_gte=10`, `createdAt_gte=2024-01-01` | Greater than or equal |
+| `field_lte=value` | number, date | `price_lte=100`, `createdAt_lte=2024-12-31` | Less than or equal |
 
-Multiple filters are combined with AND logic. Unknown fields are silently ignored.
+Multiple filters are combined with AND logic. Unknown fields are silently ignored. Date values must be ISO 8601.
 
 ```bash
-GET /users?status=active&email_like=@example.com&createdAt_from=2024-01-01
+GET /users?status=active&email_contains=@example.com&createdAt_gte=2024-01-01
+GET /products?price_gte=10&price_lte=100&status=active
 ```
 
 ### Sorting
@@ -170,7 +171,7 @@ Sorting by a field that does not exist in the interface returns `400`.
 ### Combined Example
 
 ```bash
-GET /users?page=2&pageSize=50&status=active&email_like=@example.com&sort=createdAt:desc
+GET /users?page=2&pageSize=50&status=active&email_contains=@example.com&sort=createdAt:desc
 ```
 
 ### Error Responses

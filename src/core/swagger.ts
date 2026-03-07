@@ -164,10 +164,10 @@ function buildListParameters(
       });
     }
 
-    // _like — substring match (non-date strings only)
+    // _contains — substring match (non-date strings only)
     if (isString) {
       params.push({
-        name: `${field}_like`,
+        name: `${field}_contains`,
         in: 'query',
         description: `Case-insensitive substring filter on \`${field}\``,
         required: false,
@@ -175,21 +175,38 @@ function buildListParameters(
       });
     }
 
-    // _from / _to — range filters for dates
+    // _gte / _lte — range filters for dates and numbers
     if (isDate) {
       params.push({
-        name: `${field}_from`,
+        name: `${field}_gte`,
         in: 'query',
         description: `Return items where \`${field}\` is on or after this date (ISO 8601)`,
         required: false,
         schema: { type: 'string', format: 'date-time' },
       });
       params.push({
-        name: `${field}_to`,
+        name: `${field}_lte`,
         in: 'query',
         description: `Return items where \`${field}\` is on or before this date (ISO 8601)`,
         required: false,
         schema: { type: 'string', format: 'date-time' },
+      });
+    }
+
+    if (isNumber) {
+      params.push({
+        name: `${field}_gte`,
+        in: 'query',
+        description: `Return items where \`${field}\` is greater than or equal to this value`,
+        required: false,
+        schema: { type: 'number' },
+      });
+      params.push({
+        name: `${field}_lte`,
+        in: 'query',
+        description: `Return items where \`${field}\` is less than or equal to this value`,
+        required: false,
+        schema: { type: 'number' },
       });
     }
   }

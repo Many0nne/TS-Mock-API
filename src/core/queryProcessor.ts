@@ -21,9 +21,9 @@ export interface ParsedQueryParams {
   pageSize: number;
   sort: SortEntry[];
   exactFilters: Record<string, string>;
-  likeFilters: Record<string, string>;
-  fromFilters: Record<string, string>;
-  toFilters: Record<string, string>;
+  containsFilters: Record<string, string>;
+  gteFilters: Record<string, string>;
+  lteFilters: Record<string, string>;
 }
 
 export interface PaginationMeta {
@@ -103,26 +103,26 @@ export function parseQueryParams(
 
   // filters — derived from remaining query params
   const exactFilters: Record<string, string> = {};
-  const likeFilters: Record<string, string> = {};
-  const fromFilters: Record<string, string> = {};
-  const toFilters: Record<string, string> = {};
+  const containsFilters: Record<string, string> = {};
+  const gteFilters: Record<string, string> = {};
+  const lteFilters: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(query)) {
     if (RESERVED_PARAMS.has(key) || value === undefined) continue;
     const strVal = Array.isArray(value) ? (value[0] ?? '') : value;
 
-    if (key.endsWith('_like')) {
-      likeFilters[key.slice(0, -5)] = strVal;
-    } else if (key.endsWith('_from')) {
-      fromFilters[key.slice(0, -5)] = strVal;
-    } else if (key.endsWith('_to')) {
-      toFilters[key.slice(0, -3)] = strVal;
+    if (key.endsWith('_contains')) {
+      containsFilters[key.slice(0, -9)] = strVal;
+    } else if (key.endsWith('_gte')) {
+      gteFilters[key.slice(0, -4)] = strVal;
+    } else if (key.endsWith('_lte')) {
+      lteFilters[key.slice(0, -4)] = strVal;
     } else {
       exactFilters[key] = strVal;
     }
   }
 
-  return { page, pageSize, sort, exactFilters, likeFilters, fromFilters, toFilters };
+  return { page, pageSize, sort, exactFilters, containsFilters, gteFilters, lteFilters };
 }
 
 /**
@@ -166,7 +166,7 @@ function matchesExact(
   return String(v) === value;
 }
 
-function matchesLike(
+function matchesContains(
   item: Record<string, unknown>,
   field: string,
   value: string
@@ -176,32 +176,40 @@ function matchesLike(
   return String(v).toLowerCase().includes(value.toLowerCase());
 }
 
-function matchesFrom(
+function matchesGte(
   item: Record<string, unknown>,
   field: string,
   value: string
 ): boolean {
   const v = getFieldValue(item, field);
   if (v === undefined) return true;
-  const fromDate = new Date(value);
-  if (isNaN(fromDate.getTime())) return true;
+  if (typeof v === 'number') {
+    const num = Number(value);
+    return isNaN(num) ? true : v >= num;
+  }
+  const threshold = new Date(value);
+  if (isNaN(threshold.getTime())) return true;
   const itemDate = new Date(String(v));
   if (isNaN(itemDate.getTime())) return true;
-  return itemDate >= fromDate;
+  return itemDate >= threshold;
 }
 
-function matchesTo(
+function matchesLte(
   item: Record<string, unknown>,
   field: string,
   value: string
 ): boolean {
   const v = getFieldValue(item, field);
   if (v === undefined) return true;
-  const toDate = new Date(value);
-  if (isNaN(toDate.getTime())) return true;
+  if (typeof v === 'number') {
+    const num = Number(value);
+    return isNaN(num) ? true : v <= num;
+  }
+  const threshold = new Date(value);
+  if (isNaN(threshold.getTime())) return true;
   const itemDate = new Date(String(v));
   if (isNaN(itemDate.getTime())) return true;
-  return itemDate <= toDate;
+  return itemDate <= threshold;
 }
 
 function applyFilters(
@@ -212,14 +220,14 @@ function applyFilters(
     for (const [field, value] of Object.entries(params.exactFilters)) {
       if (!matchesExact(item, field, value)) return false;
     }
-    for (const [field, value] of Object.entries(params.likeFilters)) {
-      if (!matchesLike(item, field, value)) return false;
+    for (const [field, value] of Object.entries(params.containsFilters)) {
+      if (!matchesContains(item, field, value)) return false;
     }
-    for (const [field, value] of Object.entries(params.fromFilters)) {
-      if (!matchesFrom(item, field, value)) return false;
+    for (const [field, value] of Object.entries(params.gteFilters)) {
+      if (!matchesGte(item, field, value)) return false;
     }
-    for (const [field, value] of Object.entries(params.toFilters)) {
-      if (!matchesTo(item, field, value)) return false;
+    for (const [field, value] of Object.entries(params.lteFilters)) {
+      if (!matchesLte(item, field, value)) return false;
     }
     return true;
   });
