@@ -1,0 +1,54 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+npm run dev          # Start dev server with nodemon + tsx (interactive wizard)
+npm run build        # Compile TypeScript to dist/
+npm start            # Run compiled server (dist/index.js)
+npm test             # Run all tests with Jest
+npm run test:watch   # Watch mode
+npm run test:coverage # Coverage report
+npm run clean        # Remove dist/
+```
+
+Run a single test file:
+```bash
+npm test -- constraintExtractor.test.ts
+npm test -- --testPathPattern=pluralize
+```
+
+TypeScript is strict (`noUnusedLocals`, `noUnusedParameters`, `noUncheckedIndexedAccess`, etc.). Tests live in `tests/` and are excluded from `tsconfig.json`.
+
+## Architecture
+
+**Entry point**: `src/index.ts` — parses CLI args via Commander; if no args, runs the interactive `src/cli/wizard.ts`. Both paths call `startServer(config)`.
+
+**Request lifecycle** (`src/server.ts` → `src/core/router.ts`):
+1. Express middleware chain: CORS → JSON → logger → `statusOverride` → optional latency
+2. All non-system routes hit `dynamicRouteHandler` (catch-all `app.all('*')`)
+3. Router calls `findTypeForUrl(url, typesDir)` to resolve a TypeScript interface name from the URL
+4. Calls `generateMockFromInterface` or `generateMockArray` from `src/core/parser.ts`
+5. Results cached in `schemaCache` (single objects only, not arrays)
+
+**URL → Interface resolution** (`src/utils/typeMapping.ts` + `src/utils/pluralize.ts`):
+- Scans `typesDir` recursively for `.ts` files
+- Only interfaces with `// @endpoint` (or in a JSDoc block containing `@endpoint`) are exposed
+- URL last segment is converted to PascalCase; if a matching interface exists directly (e.g. `Users` for `/users`), it wins as a non-array route
+- Otherwise, the segment is singularized via the `pluralize` library (`users` → `User`) and `isArray: true` is set
+
+**Mock generation** (`src/core/parser.ts`):
+- Uses `intermock` with `isFixedMode: false` for random data
+- After generation, `extractConstraints` parses the TypeScript AST (via `typescript` compiler API) for JSDoc annotations (`@min`, `@max`, `@minLength`, `@maxLength`, `@pattern`, `@enum`)
+- `applyConstraintsToMock` in `src/core/constrainedGenerator.ts` then regenerates non-conforming fields using Faker
+
+**Special headers**:
+- `x-mock-status: <code>` — forces the response HTTP status code (handled by `src/middlewares/statusOverride.ts`)
+
+**System routes** (not matched by dynamic handler):
+- `GET /health` — server status + cache stats
+- `GET /api-docs` — Swagger UI (spec auto-regenerated on hot-reload file changes)
+
+**Key types** (`src/types/config.ts`): `ServerConfig`, `RouteTypeMapping`, `InterfaceMetadata`, `ParsedSchema`, `MockGenerationOptions`

@@ -96,9 +96,9 @@ Options:
 curl http://localhost:8080/user
 # → {"id": 482, "name": "John Doe", "email": "john.d@gmail.com", "role": "admin"}
 
-# Array of objects (plural)
+# Array of objects (plural) — with pagination metadata
 curl http://localhost:8080/users
-# → [{"id": 1, ...}, {"id": 2, ...}, ...]
+# → {"data": [...], "meta": {"total": 100, "page": 1, "pageSize": 20, "totalPages": 5}}
 ```
 
 **Step 4: View API Documentation**
@@ -113,7 +113,78 @@ All endpoints are documented with examples and you can test them directly from y
 
 ---
 
-## Field Constraints with JSDoc Annotations
+## Pagination, Filtering & Sorting
+
+All list endpoints (plural routes that return an array) support pagination, filtering, and sorting via query parameters. Responses always use the envelope format:
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "total": 100,
+    "page": 2,
+    "pageSize": 20,
+    "totalPages": 5
+  }
+}
+```
+
+The server generates a pool of 100 mock items and applies your filters/sort/pagination to that pool, so `total` and `totalPages` reflect realistic numbers.
+
+### Pagination
+
+| Param | Default | Max | Description |
+|---|---|---|---|
+| `page` | `1` | — | Page number (1-based) |
+| `pageSize` | `20` | `100` | Items per page |
+
+```bash
+GET /users?page=2&pageSize=50
+```
+
+### Filtering
+
+| Convention | Example | Description |
+|---|---|---|
+| `field=value` | `status=active` | Exact match (case-insensitive for strings) |
+| `field_like=value` | `email_like=@example.com` | Substring match (case-insensitive) |
+| `field_from=date` | `createdAt_from=2024-01-01` | Date range — start (inclusive) |
+| `field_to=date` | `createdAt_to=2024-12-31` | Date range — end (inclusive) |
+
+Multiple filters are combined with AND logic. Unknown fields are silently ignored.
+
+```bash
+GET /users?status=active&email_like=@example.com&createdAt_from=2024-01-01
+```
+
+### Sorting
+
+Use `sort=field:dir` with comma-separated entries for multi-field sort. Direction must be `asc` or `desc`.
+
+```bash
+GET /users?sort=createdAt:desc,lastName:asc
+```
+
+Sorting by a field that does not exist in the interface returns `400`.
+
+### Combined Example
+
+```bash
+GET /users?page=2&pageSize=50&status=active&email_like=@example.com&sort=createdAt:desc
+```
+
+### Error Responses
+
+Invalid query parameters return `400` with a descriptive message:
+
+```json
+{ "error": "Invalid query parameters", "message": "\"pageSize\" must not exceed 100" }
+{ "error": "Invalid sort parameter", "message": "Cannot sort by unknown field \"foo\". Allowed fields: email, id, name" }
+```
+
+---
+
+## 🎯 Field Constraints with JSDoc Annotations
 
 Add validation constraints to your interfaces using JSDoc annotations. This ensures generated mock data follows your API rules.
 
@@ -194,9 +265,10 @@ export interface Product {
 ## Available Commands
 
 - `npm run dev` - Start development server
-- `npm run build` - Compile TypeScript  
+- `npm run build` - Compile TypeScript
 - `npm start` - Start production server
 - `npm test` - Run all tests
+- `npm test -- queryProcessor.test.ts` - Test pagination/filtering/sorting
 - `npm test -- constraintExtractor.test.ts` - Test constraint JSDoc extraction
 - `npm test -- constraintValidator.test.ts` - Test constraint validation
 - `npm test -- constrainedGenerator.test.ts` - Test constrained data generation
@@ -208,7 +280,7 @@ export interface Product {
 The server maps URL paths to TypeScript interfaces by converting the route to PascalCase and singularizing it. For example:
 
 - `/user` → looks for `User` interface → returns single object
-- `/users` → looks for `User` interface → returns array of 3-10 objects
+- `/users` → looks for `User` interface → generates 100-item pool, applies query params, returns paginated envelope
 
 Only interfaces marked with `// @endpoint` are exposed. The server uses Intermock to parse TypeScript AST and Faker to generate realistic test data. 
 
