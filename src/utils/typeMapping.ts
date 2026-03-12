@@ -154,9 +154,10 @@ export function findTypeForUrl(
     return filePath ? { typeName, isArray: true, filePath } : null;
   }
 
-  // Pattern: /collection/{id} → single
+  // Pattern: /collection/{id} → single (plural collection names only)
   if (shape === 'col-id') {
-    const { typeName } = urlSegmentToTypeName(segments[0]!);
+    const { typeName, isArray } = urlSegmentToTypeName(segments[0]!);
+    if (!isArray) return null; // reject singular collection names (e.g. /user/123)
     const filePath = typeMap.get(typeName);
     return filePath ? { typeName, isArray: false, filePath } : null;
   }

@@ -246,6 +246,14 @@ export interface Hidden {
       expect(findTypeForUrl('/user', testDir)).toBeNull();
     });
 
+    it('should return null for /user/123 (singular collection name)', () => {
+      expect(findTypeForUrl('/user/123', testDir)).toBeNull();
+    });
+
+    it('should return null for /123/users (starts with ID)', () => {
+      expect(findTypeForUrl('/123/users', testDir)).toBeNull();
+    });
+
     it('should resolve /users/123 to single User', () => {
       const r = findTypeForUrl('/users/123', testDir);
       expect(r?.typeName).toBe('User');
