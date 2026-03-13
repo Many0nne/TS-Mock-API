@@ -100,7 +100,8 @@ export function dynamicRouteHandler(config: ServerConfig) {
 
         // Validate sort fields against schema keys
         if (parsed.sort.length > 0 && pool.length > 0) {
-          const allowedFields = new Set(Object.keys(pool[0]!));
+          const firstItem = pool[0];
+          const allowedFields = new Set(firstItem ? Object.keys(firstItem) : []);
           const sortError = validateSortFields(parsed.sort, allowedFields);
           if (sortError) {
             res.status(400).json({ error: 'Invalid sort parameter', message: sortError });
