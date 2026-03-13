@@ -2,6 +2,7 @@ import chokidar from 'chokidar';
 import * as path from 'path';
 import { logger } from './logger';
 import { schemaCache, mockDataStore } from '../core/cache';
+import { invalidateTypeMap } from './typeMapping';
 
 /**
  * Configures and starts the file watcher for hot-reload
@@ -31,6 +32,7 @@ export function startFileWatcher(
       // Invalidate the cache for this file
       schemaCache.invalidateFile(filePath);
       mockDataStore.invalidateFile(filePath);
+      invalidateTypeMap();
 
       // Call the callback if provided
       if (onReload) {
@@ -39,6 +41,8 @@ export function startFileWatcher(
     })
     .on('add', (filePath) => {
       logger.success(`New file detected: ${path.basename(filePath)}`);
+
+      invalidateTypeMap();
 
       if (onReload) {
         onReload(filePath);
@@ -50,6 +54,7 @@ export function startFileWatcher(
       // Invalidate the cache for this deleted file
       schemaCache.invalidateFile(filePath);
       mockDataStore.invalidateFile(filePath);
+      invalidateTypeMap();
     })
     .on('error', (error) => {
       logger.error(`File watcher error: ${error.message}`);
