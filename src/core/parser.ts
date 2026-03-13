@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { MockGenerationOptions } from '../types/config';
 import { extractConstraints } from '../utils/constraintExtractor';
 import { applyConstraintsToMock } from './constrainedGenerator';
+import { logger } from '../utils/logger';
 
 /**
  * Generates mock data from a TypeScript interface
@@ -48,8 +49,8 @@ export function generateMockFromInterface(
       }
     } catch (constraintError) {
       // Log constraint extraction errors but don't fail the entire generation
-      console.warn(
-        `Warning: Failed to extract constraints for ${interfaceName}: ${constraintError instanceof Error ? constraintError.message : String(constraintError)}`
+      logger.warn(
+        `Failed to extract constraints for ${interfaceName}: ${constraintError instanceof Error ? constraintError.message : String(constraintError)}`
       );
     }
 
