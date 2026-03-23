@@ -22,6 +22,14 @@ export interface ServerConfig {
 
   /** Verbose mode for logging */
   verbose: boolean;
+
+  /** Enable/disable write HTTP methods (POST, PUT, PATCH, DELETE). All enabled by default. */
+  writeMethods?: {
+    post?: boolean;
+    put?: boolean;
+    patch?: boolean;
+    delete?: boolean;
+  };
 }
 
 /**

@@ -44,11 +44,13 @@ export function createServer(config: ServerConfig): Express {
       status: 'ok',
       uptime: process.uptime(),
       cache: schemaCache.getStats(),
+      writeStore: mockDataStore.getWriteStats(),
       config: {
         typesDir: config.typesDir,
         port: config.port,
         hotReload: config.hotReload,
         cache: config.cache,
+        writeMethods: config.writeMethods,
       },
     });
   });
@@ -165,7 +167,11 @@ export function startServer(
   if (config.hotReload) {
     watcher = startFileWatcher(config.typesDir, (filePath) => {
       logger.info(`Type file updated: ${filePath}`);
-      
+
+      // Clear cached data for the affected file (pools, singles, write store)
+      mockDataStore.invalidateFile(filePath);
+      schemaCache.invalidateFile(filePath);
+
       // Regenerate Swagger spec to include new endpoints
       const newSwaggerSpec = generateOpenAPISpec(config);
       app.locals.swaggerSpec = newSwaggerSpec;
