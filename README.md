@@ -1,36 +1,37 @@
-# TS-Mock-Proxy
+<p align="center" height="200">
+  <img src=".github/TS-Mock-API.png" alt="TS-Mock-Proxy" width="500" />
+</p>
 
-A "Zero-Config" mock server that instantly generates a functional REST API from your TypeScript interfaces. Write your types, get a working API. Perfect for frontend developers who need to work independently of the backend.
+<h1 align="center">TS-Mock-Proxy</h1>
+
+<p align="center">
+  Instant REST API from TypeScript interfaces — no backend required.
+</p>
+
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> ·
+  <a href="#-reference">Reference</a> ·
+  <a href="#-license">License</a>
+</p>
 
 ---
 
-## Tech Stack
-
-Built with TypeScript, Express, and Swagger UI. Uses Intermock for type analysis and Faker for realistic test data generation.
+Write a TypeScript interface, get a fully working REST API with realistic mock data, pagination, filtering, Swagger docs, and persistence. Ideal for frontend teams working independently of the backend.
 
 ---
 
-## Quick Start
+## ⚡ Quick Start
 
-### Installation
+### 1 — Install
 
 ```bash
-# Clone the project
-git clone <repo-url>
-cd ts-mock-proxy
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
+npm install -g ts-mock-proxy
+# or use directly with npx (no install needed)
 ```
 
-### Usage
+### 2 — Define your types
 
-**Step 1: Define your TypeScript types**
-
-Mark interfaces with `// @endpoint` to expose them as API endpoints:
+Mark any interface with `// @endpoint` to expose it as an API route:
 
 ```typescript
 // types/user.ts
@@ -43,40 +44,52 @@ export interface User {
 }
 ```
 
-**Step 2: Start the mock server**
-
-**Interactive Mode (Recommended)**
+### 3 — Start the server
 
 ```bash
-npm run dev
-# or
+# Interactive wizard (recommended for first run)
 npx ts-mock-proxy
+
+# Or directly via CLI
+npx ts-mock-proxy --types-dir ./types --port 3000
 ```
 
-You'll be prompted for:
-- Types directory location
-- Server port (default: 8080)
-- Optional features (hot-reload, caching, latency simulation)
-
-**CLI Mode (Automation)**
-
-Use command-line options for scripting or CI/CD:
+### 4 — Call your API
 
 ```bash
-# Basic usage - specify your types directory
-npx ts-mock-proxy --types-dir ./types --port 3000
-
-# Examples
-npx ts-mock-proxy --types-dir ./types --port 3000 --verbose
-
-# With latency simulation
-npx ts-mock-proxy --types-dir ./types --port 3000 --latency 500-2000
-
-# Disable features
-npx ts-mock-proxy --types-dir ./types --no-cache --no-hot-reload
+GET  /users          # → paginated list of User
+GET  /users/1        # → single User
+POST /users          # → create (body echoed back)
+PUT  /users/1        # → replace
+PATCH /users/1       # → partial update
+DELETE /users/1      # → delete
 ```
 
-**Available CLI Options**
+> URL prefixes `api` and `v{n}` are stripped automatically — `/api/v1/users/1` works the same as `/users/1`.
+
+### 5 — Explore in Swagger
+
+```
+http://localhost:8080/api-docs
+```
+
+All endpoints are documented and testable directly from the browser.
+
+---
+
+## 📖 Reference
+
+- [CLI Options](#cli-options)
+- [URL Patterns](#url-patterns)
+- [Pagination, Filtering & Sorting](#pagination-filtering--sorting)
+- [JSDoc Field Constraints](#jsdoc-field-constraints)
+- [Mock Modes](#mock-modes)
+- [JSON Persistence](#json-persistence)
+- [How It Works](#how-it-works)
+
+---
+
+### CLI Options
 
 ```
 Options:
@@ -91,123 +104,71 @@ Options:
   -h, --help                    Show help
 ```
 
-**Environment Variables**
+**Environment variables**
 
 | Variable | Values | Description |
 |---|---|---|
-| `MOCK_API_MODE` | `strict`, `dev` | Override mock mode without CLI flag |
+| `MOCK_API_MODE` | `strict`, `dev` | Override mock mode without a CLI flag |
 
 Resolution order: CLI `--mock-mode` > `MOCK_API_MODE` env var > config file > default (`dev`).
 
-**Step 3: Call your API**
+---
 
-The server enforces idiomatic REST URL patterns:
+### URL Patterns
 
-| URL | Result |
+The server only accepts idiomatic REST URLs. Each path segment is classified as a **collection name** (plural noun) or an **ID** (numeric, UUID, or MongoDB ObjectId).
+
+| URL | Response |
 |---|---|
-| `GET /users` | Array of `User` (paginated) |
+| `GET /users` | Paginated array of `User` |
 | `GET /users/123` | Single `User` |
-| `GET /users/{uuid}` | Single `User` |
-| `GET /users/123/posts` | Array of `Post` (if `Post` is defined) |
-| `GET /user` | 404 — singular collection names are rejected |
-| `GET /users/123/posts/456` | 404 — nested single-item not supported |
-
-```bash
-# List (plural URL) — with pagination metadata
-curl http://localhost:8080/users
-# → {"data": [...], "meta": {"total": 100, "page": 1, "pageSize": 20, "totalPages": 5}}
-
-# Single item by numeric ID
-curl http://localhost:8080/users/1
-# → {"id": 482, "name": "John Doe", "email": "john.d@gmail.com", "role": "admin"}
-
-# Single item by UUID
-curl http://localhost:8080/users/550e8400-e29b-41d4-a716-446655440000
-# → {"id": 482, "name": "John Doe", ...}
-
-# Nested collection (requires Post interface with @endpoint)
-curl http://localhost:8080/users/1/posts
-# → {"data": [...], "meta": {...}}
-```
-
-URL prefix segments `api` and `v{n}` are stripped automatically, so `/api/v1/users/1` works the same as `/users/1`.
-
-**Step 4: View API Documentation**
-
-Access the auto-generated Swagger UI:
-
-```
-http://localhost:8080/api-docs
-```
-
-All endpoints are documented with examples and you can test them directly from your browser.
+| `GET /users/550e8400-…` | Single `User` (UUID) |
+| `GET /users/123/posts` | Paginated array of `Post` |
+| `GET /user` | **404** — singular names are rejected |
+| `GET /users/123/posts/456` | **404** — nested single items are not supported |
 
 ---
 
-## Pagination, Filtering & Sorting
+### Pagination, Filtering & Sorting
 
-All list endpoints (plural routes that return an array) support pagination, filtering, and sorting via query parameters. Responses always use the envelope format:
+All collection endpoints (`GET /resources`) support these query parameters. Responses always use the envelope format:
 
 ```json
 {
   "data": [...],
-  "meta": {
-    "total": 100,
-    "page": 2,
-    "pageSize": 20,
-    "totalPages": 5
-  }
+  "meta": { "total": 100, "page": 2, "pageSize": 20, "totalPages": 5 }
 }
 ```
 
-The server generates a pool of 100 mock items and applies your filters/sort/pagination to that pool, so `total` and `totalPages` reflect realistic numbers.
+The server maintains an in-memory pool of 100 mock items per type — filters, sort, and pagination operate on that pool, so `total` reflects a realistic number.
 
-### Pagination
+#### Pagination
 
 | Param | Default | Max | Description |
 |---|---|---|---|
 | `page` | `1` | — | Page number (1-based) |
 | `pageSize` | `20` | `100` | Items per page |
 
-```bash
-GET /users?page=2&pageSize=50
-```
+#### Filtering
 
-### Filtering
-
-| Convention | Applies to | Example | Description |
+| Convention | Type | Example | Description |
 |---|---|---|---|
-| `field=value` | string, number, boolean | `status=active` | Exact match (case-insensitive for strings) |
-| `field_contains=value` | string | `email_contains=@example.com` | Substring match (case-insensitive) |
-| `field_gte=value` | number, date | `price_gte=10`, `createdAt_gte=2024-01-01` | Greater than or equal |
-| `field_lte=value` | number, date | `price_lte=100`, `createdAt_lte=2024-12-31` | Less than or equal |
+| `field=value` | string / number / boolean | `role=admin` | Exact match (case-insensitive for strings) |
+| `field_contains=value` | string | `email_contains=@example.com` | Substring match |
+| `field_gte=value` | number / date | `createdAt_gte=2024-01-01` | Greater than or equal |
+| `field_lte=value` | number / date | `price_lte=100` | Less than or equal |
 
-Multiple filters are combined with AND logic. Unknown fields are silently ignored. Date values must be ISO 8601.
+Multiple filters combine with AND logic. Unknown fields are ignored. Dates must be ISO 8601.
 
-```bash
-GET /users?status=active&email_contains=@example.com&createdAt_gte=2024-01-01
-GET /products?price_gte=10&price_lte=100&status=active
-```
-
-### Sorting
-
-Use `sort=field:dir` with comma-separated entries for multi-field sort. Direction must be `asc` or `desc`.
+#### Sorting
 
 ```bash
-GET /users?sort=createdAt:desc,lastName:asc
+GET /users?sort=createdAt:desc,name:asc
 ```
 
-Sorting by a field that does not exist in the interface returns `400`.
+Sorting by a field that doesn't exist in the interface returns `400`.
 
-### Combined Example
-
-```bash
-GET /users?page=2&pageSize=50&status=active&email_contains=@example.com&sort=createdAt:desc
-```
-
-### Error Responses
-
-Invalid query parameters return `400` with a descriptive message:
+#### Error responses
 
 ```json
 { "error": "Invalid query parameters", "message": "\"pageSize\" must not exceed 100" }
@@ -216,104 +177,81 @@ Invalid query parameters return `400` with a descriptive message:
 
 ---
 
-## 🎯 Field Constraints with JSDoc Annotations
+### JSDoc Field Constraints
 
-Add validation constraints to your interfaces using JSDoc annotations. This ensures generated mock data follows your API rules.
+Add constraints to interface fields using JSDoc annotations. Generated mock data will always respect these rules.
 
-### Supported Constraints
-
-| Annotation | Type | Example | Description |
-|---|---|---|---|
-| `@minLength` | string | `@minLength 3` | Minimum string length |
-| `@maxLength` | string | `@maxLength 10` | Maximum string length |
-| `@pattern` | string | `@pattern ^[a-z]+$` | Regex pattern validation |
-| `@min` | number | `@min 1` | Minimum numeric value |
-| `@max` | number | `@max 100` | Maximum numeric value |
-| `@enum` | any | `@enum ACTIVE,INACTIVE,PENDING` | Allowed values (comma-separated) |
-
-### Usage Examples
+| Annotation | Type | Example |
+|---|---|---|
+| `@min` / `@max` | number | `@min 1 @max 100` |
+| `@minLength` / `@maxLength` | string | `@minLength 3 @maxLength 20` |
+| `@pattern` | string | `@pattern ^[a-z]+$` |
+| `@enum` | any | `@enum ACTIVE,INACTIVE,PENDING` |
 
 ```typescript
-// @endpoint
-export interface Badge {
-  /** @maxLength 10 */
-  label: string;
-  
-  /** @min 1 @max 5 */
-  level: number;
-  
-  /** @enum ACTIVE,INACTIVE,PENDING */
-  status: string;
-}
-```
-
-Response:
-```json
-{ "label": "New", "level": 3, "status": "ACTIVE" }
-```
-
-### More Examples
-
-```typescript
-// @endpoint
-export interface User {
-  id: number;
-  
-  /** @minLength 3 @maxLength 20 */
-  username: string;
-  
-  // not needed, email is one of the types handled by intermock
-  email: string;
-  
-  /** @min 18 @max 120 */
-  age: number;
-}
-
 // @endpoint
 export interface Product {
   /** @maxLength 50 */
   title: string;
-  
-  /** @minLength 10 @maxLength 500 */
-  description: string;
-  
+
   /** @min 0.01 @max 999999.99 */
   price: number;
-  
+
   /** @enum DRAFT,PUBLISHED,ARCHIVED */
   status: string;
+
+  /** @minLength 10 @maxLength 500 */
+  description: string;
 }
 ```
 
-### How It Works
+Generated response:
+```json
+{ "title": "Wireless Headphones", "price": 49.99, "status": "PUBLISHED", "description": "A detailed product description..." }
+```
 
-1. Constraints are extracted from JSDoc comments when generating mock data
-2. Intermock generates base mock data
-3. The constraint resolver applies your rules to ensure valid data
-4. **No validation** - constraints are applied, not enforced. Mocks always return valid data.
-
-
-
-## Available Commands
-
-- `npm run dev` - Start development server
-- `npm run build` - Compile TypeScript
-- `npm start` - Start production server
-- `npm test` - Run all tests
-- `npm test -- queryProcessor.test.ts` - Test pagination/filtering/sorting
-- `npm test -- constraintExtractor.test.ts` - Test constraint JSDoc extraction
-- `npm test -- constraintValidator.test.ts` - Test constraint validation
-- `npm test -- constrainedGenerator.test.ts` - Test constrained data generation
+> Constraints are applied during generation, not enforced at validation time. Mock data is always returned — never rejected.
 
 ---
 
-## JSON Persistence
+### Mock Modes
 
-By default, mock data is purely in-memory and resets on every server restart. Enable persistence to keep data between sessions or share a stable dataset across restarts.
+| Mode | Description |
+|---|---|
+| `dev` (default) | Full mock features: `x-mock-status` header, artificial latency |
+| `strict` | Clean REST simulation — mock features disabled, behaves like a real API |
 
-### Activation
+```bash
+npx ts-mock-proxy --types-dir ./types --mock-mode strict
+# or
+MOCK_API_MODE=strict npx ts-mock-proxy --types-dir ./types
+```
 
-**CLI:**
+#### Dev-mode features
+
+**Force a response status** with the `x-mock-status` header:
+
+```bash
+curl -H "x-mock-status: 503" http://localhost:8080/users
+# → 503 response, regardless of the route
+```
+
+**Simulate network latency** via `--latency min-max` (milliseconds):
+
+```bash
+npx ts-mock-proxy --types-dir ./types --latency 200-800
+```
+
+In `strict` mode these features are never mounted — not just disabled, they don't exist in the request pipeline.
+
+---
+
+### JSON Persistence
+
+By default mock data is in-memory and resets on restart. Enable persistence to keep data between sessions.
+
+#### Enable
+
 ```bash
 npx ts-mock-proxy --types-dir ./types --persist-data
 # Uses default path: .mock-data.json
@@ -322,16 +260,16 @@ npx ts-mock-proxy --types-dir ./types --persist-data ./data/mocks.json
 # Custom path
 ```
 
-**Wizard:** enable in the advanced options section.
-
-**Config file** (`.mock-config.json`):
+Via config file (`.mock-config.json`):
 ```json
 { "persistData": ".mock-data.json" }
 ```
 
-### File Format
+Or through the interactive wizard (advanced options section).
 
-The file is a flat JSON object keyed by TypeScript interface name:
+#### File format
+
+A flat JSON object keyed by TypeScript interface name:
 
 ```json
 {
@@ -345,97 +283,50 @@ The file is a flat JSON object keyed by TypeScript interface name:
 }
 ```
 
-You can edit this file manually while the server is stopped. Changes are loaded on the next startup.
+You can edit this file manually while the server is stopped — changes are picked up on the next startup.
 
-> **Warning:** if the server is running and a mutation (POST/PUT/PATCH/DELETE) occurs between your manual edit and the next restart, the automatic save will overwrite your edits. Stop the server before editing the file.
+> **Warning:** if a mutation (POST/PUT/PATCH/DELETE) happens while the server is running, it will overwrite the file. Stop the server before editing manually.
 
-### Behaviour
+#### Behaviour reference
 
 | Situation | Result |
 |---|---|
 | First launch, no file | File created with generated data |
-| Restart, file present | Pools replaced by file content |
-| New type added to `typesDir` | Generated and added to file at startup |
+| Restart, file present | Pools loaded from file |
+| New type added to `typesDir` | Generated and appended to file at startup |
 | POST / PUT / PATCH / DELETE | File updated atomically after every mutation |
 | `POST /mock-reset` | File overwritten with freshly generated data |
 | `POST /mock-reset/User` | Only `User` regenerated and saved |
-| `[]` in file | Preserved as-is — not regenerated (intentional empty state) |
-| Invalid JSON in file | Warning emitted, server starts normally, file not overwritten |
+| `[]` in file | Preserved — not regenerated (intentional empty state) |
+| Invalid JSON in file | Warning logged, server starts normally, file left untouched |
 | Hot-reload (type file changed) | Affected types regenerated and saved; others untouched |
 
-Writes are atomic: the server writes to `.mock-data.json.tmp` first then renames it, so an interrupted write never corrupts the existing file.
+Writes are atomic: data goes to `.mock-data.json.tmp` first, then renamed, so an interrupted write never corrupts the existing file.
 
-### Selective Rebuild
+#### Selective rebuild
 
-Regenerate one type without affecting others:
+Regenerate a single type without touching the others:
 
 ```bash
 POST /mock-reset/User
 # → {"message": "Mock data regenerated for type \"User\"", "type": "User", "count": 10}
 ```
 
-The Swagger UI also exposes a type selector dropdown ("Select type… → Rebuild selected") next to the existing "Rebuild Data" (all) button.
+The Swagger UI also exposes a type selector dropdown → **Rebuild selected** next to the global **Rebuild Data** button.
 
 ---
 
-## Mock Modes
+### How It Works
 
-The server supports two modes controlled by `mockMode`:
+1. **Type discovery** — the server scans `typesDir` recursively for `.ts` files. Only interfaces annotated with `// @endpoint` (or a JSDoc `@endpoint` block) are exposed.
 
-| Mode | Description |
-|---|---|
-| `dev` (default) | All mock features enabled: `x-mock-status` header, artificial latency |
-| `strict` | Clean REST simulation — mock features disabled, behaviour matches a real API |
+2. **URL routing** — `api` and `v{n}` prefix segments are stripped. Remaining segments are classified as collection names (plural noun) or IDs (numeric / UUID / ObjectId). Anything that doesn't match a known pattern returns 404.
 
-In `strict` mode, the `statusOverride` and `latency` middlewares are not mounted at all.
+3. **Mock generation** — Intermock parses the TypeScript AST to understand your interface shape. Faker generates realistic field values. JSDoc constraint annotations (`@min`, `@max`, `@enum`, etc.) are applied post-generation to ensure conformance.
 
-```bash
-# CLI
-npx ts-mock-proxy --types-dir ./types --mock-mode strict
+4. **Data pools** — each `@endpoint` type gets a pool of 100 mock items on first request. Filters, sorting, and pagination operate on this pool, so collection sizes feel realistic across pages.
 
-# Environment variable
-MOCK_API_MODE=strict npx ts-mock-proxy --types-dir ./types
-```
-
-### Mock features (dev mode only, non-prod)
-
-These features are active only in `dev` mode and should not be used to simulate real API behaviour:
-
-**`x-mock-status`** — forces any response to return the specified HTTP status code:
-
-```bash
-# Force a 503 response
-curl -H "x-mock-status: 503" http://localhost:8080/users
-```
-
-**Artificial latency** — simulates network delay (configured via `--latency` or the wizard):
-
-```bash
-npx ts-mock-proxy --types-dir ./types --latency 200-800
-```
-
----
-
-## How It Works
-
-The server enforces idiomatic REST URL patterns. URLs are parsed into segments (stripping `api` and `v{n}` prefixes) and each segment is classified as either a **collection name** or an **ID** (numeric, UUID, or MongoDB ObjectId).
-
-Supported shapes:
-
-| URL shape | Resolves to |
-|---|---|
-| `/resources` | Array of the matching interface (plural names only) |
-| `/resources/{id}` | Single instance of the matching interface |
-| `/resources/{id}/sub-resources` | Array of the sub-resource interface |
-| Anything else | 404 |
-
-Only interfaces marked with `// @endpoint` are exposed. The server uses Intermock to parse TypeScript AST and Faker to generate realistic test data.
-
-**Constraint Processing**: When a request is made, the system:
-1. Extracts JSDoc annotations from each field in the interface
-2. Generates initial mock data using Intermock/Faker
-3. Applies constraints (length, range, enum, pattern) to ensure valid test data
-4. Caches schemas in memory for performance
+5. **Write operations** — POST/PUT/PATCH/DELETE mutate an in-memory write store on top of the pool. The merged view (write store + pool − deleted IDs) is what GET collection endpoints return.
 
 ---
 
