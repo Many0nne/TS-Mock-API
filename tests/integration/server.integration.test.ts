@@ -467,21 +467,18 @@ describe('Server integration', () => {
       expect(res.status).toBe(404);
     });
 
-    it('does not affect other types', async () => {
-      // Seed users, record first ID
-      const listBefore = await request(app).get('/api/users');
-      const idBefore = listBefore.body.data[0].id;
+    it('clears mutations — POSTed item is gone after reset', async () => {
+      // Add a sentinel item so we have a known mutation
+      await request(app).post('/api/users').send({ name: '__sentinel__' });
+      const listBefore = await request(app).get('/api/users?pageSize=100');
+      expect(listBefore.body.data.map((u: { name: unknown }) => u.name)).toContain('__sentinel__');
 
-      // This type doesn't exist but serves as proof other types are untouched
-      // — we just verify our User pool is regenerated (new IDs may differ)
       await request(app).post('/mock-reset/User');
 
-      const listAfter = await request(app).get('/api/users');
+      const listAfter = await request(app).get('/api/users?pageSize=100');
       expect(listAfter.status).toBe(200);
       expect(listAfter.body.data.length).toBeGreaterThan(0);
-      // Pool was regenerated so the previous ID may no longer exist
-      const idsAfter = listAfter.body.data.map((u: { id: unknown }) => String(u.id));
-      expect(idsAfter).not.toContain(String(idBefore));
+      expect(listAfter.body.data.map((u: { name: unknown }) => u.name)).not.toContain('__sentinel__');
     });
   });
 

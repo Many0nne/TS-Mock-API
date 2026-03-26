@@ -7,6 +7,7 @@ import { generateMockFromInterface, generateMockArray } from './parser';
 import { mockDataStore } from './cache';
 import { logger } from '../utils/logger';
 import { saveMockData } from '../utils/dataPersistence';
+import { extractMockId } from '../utils/mockId';
 import {
   parseQueryParams,
   validateSortFields,
@@ -25,16 +26,6 @@ function extractIdFromUrl(url: string): string | undefined {
   for (let i = segments.length - 1; i >= 0; i--) {
     if (isIdSegment(segments[i]!)) {
       return segments[i];
-    }
-  }
-  return undefined;
-}
-
-/** Returns the value of the first recognised ID field (id, uuid, _id) in a mock object. */
-function extractMockId(obj: Record<string, unknown>): string | undefined {
-  for (const field of ['id', 'uuid', '_id']) {
-    if (obj[field] !== undefined) {
-      return String(obj[field]);
     }
   }
   return undefined;

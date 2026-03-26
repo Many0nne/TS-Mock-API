@@ -41,3 +41,7 @@ temp/
 # Config files
 .mock-config.json
 docs/
+
+# Mock data persistence
+.mock-data.json
+.mock-data.json.tmp

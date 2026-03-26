@@ -223,6 +223,7 @@ window.addEventListener('load', function () {
       return;
     }
 
+    mockDataStore.invalidateType(typeName, typeFilePath);
     const newPool = generateMockArray(typeFilePath, typeName, { arrayLength: POOL_SIZE });
     mockDataStore.setPool(typeName, typeFilePath, newPool);
 

@@ -1,13 +1,6 @@
 import { ParsedSchema } from '../types/config';
 import { logger } from '../utils/logger';
-
-/** Returns the value of the first recognised ID field (id, uuid, _id) in a mock object. */
-function extractMockId(obj: Record<string, unknown>): string | undefined {
-  for (const field of ['id', 'uuid', '_id']) {
-    if (obj[field] !== undefined) return String(obj[field]);
-  }
-  return undefined;
-}
+import { extractMockId } from '../utils/mockId';
 
 /**
  * In-memory cache for parsed TypeScript schemas
@@ -229,6 +222,13 @@ export class MockDataStore {
     if (count > 0) {
       logger.info(`MockDataStore invalidated: ${count} entry/entries from ${filePath}`);
     }
+  }
+
+  invalidateType(typeName: string, filePath: string): void {
+    const k = this.key(typeName, filePath);
+    this.pools.delete(k);
+    this.writeStore.delete(k);
+    this.deletedIds.delete(k);
   }
 
   clear(): { pools: number } {

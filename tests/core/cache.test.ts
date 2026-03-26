@@ -270,4 +270,40 @@ describe('MockDataStore', () => {
       expect(store.getLivePool('Unknown', '/path/unknown.ts')).toEqual([]);
     });
   });
+
+  describe('invalidateType', () => {
+    it('removes pool for the given type', () => {
+      store.setPool('User', '/path/user.ts', [{ id: 1, name: 'Alice' }]);
+      store.invalidateType('User', '/path/user.ts');
+      expect(store.getPool('User', '/path/user.ts')).toBeUndefined();
+    });
+
+    it('removes write store entries for the given type', () => {
+      store.setById('User', '/path/user.ts', '1', { id: 1, name: 'Updated' });
+      store.invalidateType('User', '/path/user.ts');
+      expect(store.getAllWriteEntries('User', '/path/user.ts').size).toBe(0);
+    });
+
+    it('removes deletedIds for the given type', () => {
+      store.setPool('User', '/path/user.ts', [{ id: 1 }]);
+      store.markDeleted('User', '/path/user.ts', '1');
+      store.invalidateType('User', '/path/user.ts');
+      expect(store.getDeletedIds('User', '/path/user.ts').size).toBe(0);
+    });
+
+    it('does not affect other types', () => {
+      store.setPool('User', '/path/user.ts', [{ id: 1 }]);
+      store.setPool('Post', '/path/post.ts', [{ id: 2 }]);
+      store.invalidateType('User', '/path/user.ts');
+      expect(store.getPool('Post', '/path/post.ts')).toEqual([{ id: 2 }]);
+    });
+
+    it('getLivePool returns [] after invalidateType', () => {
+      store.setPool('User', '/path/user.ts', [{ id: 1, name: 'Alice' }]);
+      store.setById('User', '/path/user.ts', '2', { id: 2, name: 'Bob' });
+      store.markDeleted('User', '/path/user.ts', '1');
+      store.invalidateType('User', '/path/user.ts');
+      expect(store.getLivePool('User', '/path/user.ts')).toEqual([]);
+    });
+  });
 });
