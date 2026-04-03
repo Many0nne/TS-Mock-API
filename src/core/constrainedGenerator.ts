@@ -24,9 +24,10 @@ export function generateConstrainedString(constraints: FieldConstraint[]): strin
 
   const { min, max } = getStringLengthBounds(constraints);
 
-  // Generate a random string of appropriate length
-  const length = faker.number.int({ min, max });
-  return faker.string.alphanumeric(length);
+  // Generate lorem ipsum text and trim to fit within bounds
+  const raw = faker.lorem.words({ min: 2, max: 6 });
+  const trimmed = raw.slice(0, max);
+  return trimmed.length >= min ? trimmed : trimmed.padEnd(min, 'x');
 }
 
 /**
