@@ -20,6 +20,36 @@ Write a TypeScript interface, get a fully working REST API with realistic mock d
 
 ---
 
+## 🖥️ Try the Demo
+
+The repo includes a ready-to-use demo with sample types and a frontend UI.
+
+**1 — Install dependencies** (first time only)
+
+```bash
+npm install
+```
+
+**2 — Start the server**
+
+```bash
+npm start
+```
+
+This uses `.mock-config.json` at the root, which points to `demo/types/` on port `3000`.
+
+**3 — Open the frontend**
+
+Open `demo/index.html` directly in your browser (no server needed for the UI itself):
+
+```
+demo/index.html   ← open this file in your browser
+```
+
+Then click **Connect** — the UI will automatically discover the available types (`User`, `Product`, `Order`) and let you browse, filter, create, edit, and delete mock data.
+
+---
+
 ## ⚡ Quick Start
 
 ### 1 — Install
