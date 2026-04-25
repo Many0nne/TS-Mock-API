@@ -1000,13 +1000,23 @@ function highlightJson(obj) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 
-  return escaped.replaceAll(/"[^"\\]*"\s*:|"[^"\\]*"|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, (m) => {
-      let cls = 'json-number';
-      if (m.startsWith('"')) cls = m.endsWith(':') ? 'json-key' : 'json-string';
-      else if (m === 'true' || m === 'false') cls = 'json-bool';
-      else if (m === 'null') cls = 'json-null';
-      return `<span class="${cls}">${m}</span>`;
-    });
+  const tokenPattern = /"[^"\\]*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null/g;
+
+  return escaped.replaceAll(tokenPattern, (m, offset, source) => {
+    let cls = 'json-number';
+
+    if (m.startsWith('"')) {
+      let i = offset + m.length;
+      while (i < source.length && /\s/.test(source[i])) i++;
+      cls = source[i] === ':' ? 'json-key' : 'json-string';
+    } else if (m === 'true' || m === 'false') {
+      cls = 'json-bool';
+    } else if (m === 'null') {
+      cls = 'json-null';
+    }
+
+    return `<span class="${cls}">${m}</span>`;
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1224,7 +1234,11 @@ function hidePlaceholder() {
 ═══════════════════════════════════════════════════════════ */
 async function connectToServer() {
   const urlInput = document.getElementById('server-url');
-  state.serverUrl = urlInput.value.trim().replaceAll(/\/+$/g, '');
+  let normalizedUrl = urlInput.value.trim();
+  while (normalizedUrl.endsWith('/') && !normalizedUrl.endsWith('://')) {
+    normalizedUrl = normalizedUrl.slice(0, -1);
+  }
+  state.serverUrl = normalizedUrl;
   localStorage.setItem('serverUrl', state.serverUrl);
 
   setConnecting();
