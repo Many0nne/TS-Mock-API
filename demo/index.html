@@ -766,7 +766,12 @@
 
   <div id="table-wrapper">
     <table id="data-table">
-      <thead id="table-head"></thead>
+      <thead id="table-head">
+        <tr>
+          <th scope="col">Field</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
       <tbody id="table-body"></tbody>
     </table>
     <div id="empty-state" style="display:none">
@@ -990,13 +995,16 @@ function showToast(msg, type = 'success') {
 ═══════════════════════════════════════════════════════════ */
 function highlightJson(obj) {
   const json = JSON.stringify(obj, null, 2);
-  return json
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (m) => {
+  const escaped = json
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+
+  return escaped.replaceAll(/"[^"\\]*"\s*:|"[^"\\]*"|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, (m) => {
       let cls = 'json-number';
-      if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-string';
-      else if (/true|false/.test(m)) cls = 'json-bool';
-      else if (/null/.test(m)) cls = 'json-null';
+      if (m.startsWith('"')) cls = m.endsWith(':') ? 'json-key' : 'json-string';
+      else if (m === 'true' || m === 'false') cls = 'json-bool';
+      else if (m === 'null') cls = 'json-null';
       return `<span class="${cls}">${m}</span>`;
     });
 }
@@ -1033,7 +1041,7 @@ function renderConnectionBar(connected, healthData) {
   if (connected && healthData) {
     const uptime = Math.floor(healthData.uptime ?? 0);
     const typeCount = (healthData.types ?? []).length;
-    meta.textContent = `${typeCount} type${typeCount !== 1 ? 's' : ''} · uptime ${uptime}s`;
+    meta.textContent = `${typeCount} type${typeCount === 1 ? '' : 's'} · uptime ${uptime}s`;
   } else {
     meta.textContent = '';
   }
@@ -1125,7 +1133,7 @@ function renderPagination(meta) {
     return;
   }
 
-  info.textContent = `Page ${meta.page} of ${meta.totalPages} · ${meta.total} item${meta.total !== 1 ? 's' : ''}`;
+  info.textContent = `Page ${meta.page} of ${meta.totalPages} · ${meta.total} item${meta.total === 1 ? '' : 's'}`;
   prev.disabled = meta.page <= 1;
   next.disabled = meta.page >= meta.totalPages;
 }
@@ -1136,7 +1144,7 @@ function renderDetailPanel(item) {
   const json = document.getElementById('detail-json');
   const id = getItemId(item);
 
-  title.textContent = `${state.activeType} ${id !== null ? '#' + id : ''}`;
+  title.textContent = `${state.activeType} ${id === null ? '' : '#' + id}`;
   json.innerHTML = highlightJson(item);
   panel.classList.add('open');
 
@@ -1159,12 +1167,18 @@ function renderModal(mode, item) {
 
   state.editingId = mode === 'edit' ? getItemId(item) : null;
 
-  title.textContent = mode === 'create'
-    ? `Create ${state.activeType}`
-    : `Edit ${state.activeType} #${state.editingId}`;
+  if (mode === 'create') {
+    title.textContent = `Create ${state.activeType}`;
+  } else {
+    title.textContent = `Edit ${state.activeType} #${state.editingId}`;
+  }
 
   let sample = item ? { ...item } : {};
-  if (mode === 'create') delete sample.id, delete sample.uuid, delete sample._id;
+  if (mode === 'create') {
+    delete sample.id;
+    delete sample.uuid;
+    delete sample._id;
+  }
   textarea.value = JSON.stringify(sample, null, 2);
   err.style.display = 'none';
   err.textContent = '';
@@ -1210,7 +1224,7 @@ function hidePlaceholder() {
 ═══════════════════════════════════════════════════════════ */
 async function connectToServer() {
   const urlInput = document.getElementById('server-url');
-  state.serverUrl = urlInput.value.trim().replace(/\/$/, '');
+  state.serverUrl = urlInput.value.trim().replaceAll(/\/+$/g, '');
   localStorage.setItem('serverUrl', state.serverUrl);
 
   setConnecting();
@@ -1337,10 +1351,10 @@ async function submitModal() {
   }
 
   let res;
-  if (state.editingId !== null) {
-    res = await api.update(state.activeType, state.editingId, body);
-  } else {
+  if (state.editingId === null) {
     res = await api.create(state.activeType, body);
+  } else {
+    res = await api.update(state.activeType, state.editingId, body);
   }
 
   if (!res.ok) {
@@ -1349,15 +1363,21 @@ async function submitModal() {
   }
 
   closeModal();
-  const msg = state.editingId !== null
-    ? `Updated ${state.activeType} #${state.editingId}`
-    : `Created ${state.activeType}` + (res.location ? ' at ' + res.location : '');
+  let msg;
+  if (state.editingId === null) {
+    msg = `Created ${state.activeType}`;
+    if (res.location) {
+      msg += ` at ${res.location}`;
+    }
+  } else {
+    msg = `Updated ${state.activeType} #${state.editingId}`;
+  }
   showToast(msg);
   await loadCollection();
 }
 
 async function deleteItem(id) {
-  if (!window.confirm(`Delete ${state.activeType} #${id}?`)) return;
+  if (globalThis.confirm(`Delete ${state.activeType} #${id}?`) === false) return;
   const res = await api.remove(state.activeType, id);
   if (!res.ok) {
     showToast(res.error || 'Delete failed', 'error');
@@ -1369,7 +1389,7 @@ async function deleteItem(id) {
 }
 
 async function resetAll() {
-  if (!window.confirm('Reset ALL mock data? This will regenerate all types.')) return;
+  if (globalThis.confirm('Reset ALL mock data? This will regenerate all types.') === false) return;
   const res = await api.resetAll();
   if (!res.ok) { showToast(res.error || 'Reset failed', 'error'); return; }
   showToast('All mock data reset');
