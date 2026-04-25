@@ -7,8 +7,6 @@
     /* Modules */
     "module": "commonjs",
     "rootDir": "./src",
-    "moduleResolution": "node",
-    "baseUrl": "./src",
     "resolveJsonModule": true,
 
     /* Emit */
